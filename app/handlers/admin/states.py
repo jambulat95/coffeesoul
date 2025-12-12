@@ -23,3 +23,8 @@ class AddManager(StatesGroup):
     full_name = State()
     shop_name = State()
 
+
+class AddSuperAdmin(StatesGroup):
+    tg_id = State()
+    full_name = State()
+

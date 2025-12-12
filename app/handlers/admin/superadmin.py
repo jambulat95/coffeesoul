@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from aiogram import F, types
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from app import crud as db
 from app.utils import cancel_kb
 
 from .router import router
-from .states import AddManager
+from .states import AddManager, AddSuperAdmin
 
 
 @router.message(F.text == "📊 Полный Отчет (Месяц)")
@@ -87,3 +88,51 @@ async def set_manager_shop(message: types.Message, state: FSMContext) -> None:
     )
     await state.clear()
 
+
+@router.message(Command("add_superadmin"))
+async def start_add_superadmin(message: types.Message, state: FSMContext) -> None:
+    user = await db.get_user(message.from_user.id)
+    if not user or user.role != "superadmin":
+        return
+
+    await message.answer(
+        "🚀 <b>Добавление Superadmin</b>\n\nВведите <b>Telegram ID</b> нового администратора:",
+        reply_markup=cancel_kb(),
+    )
+    await state.set_state(AddSuperAdmin.tg_id)
+
+
+@router.message(AddSuperAdmin.tg_id)
+async def set_superadmin_id(message: types.Message, state: FSMContext) -> None:
+    if not (message.text and message.text.isdigit()):
+        await message.answer("⚠️ Только цифры!", reply_markup=cancel_kb())
+        return
+
+    await state.update_data(tg_id=int(message.text))
+    await message.answer(
+        "👤 Введите <b>ФИО</b> (или имя) нового администратора:", reply_markup=cancel_kb()
+    )
+    await state.set_state(AddSuperAdmin.full_name)
+
+
+@router.message(AddSuperAdmin.full_name)
+async def set_superadmin_name(message: types.Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    full_name = message.text
+
+    # shop_id and position are required by DB but irrelevant for superadmin
+    await db.add_user(
+        tg_id=data["tg_id"],
+        full_name=full_name,
+        role="superadmin",
+        shop_id="GLOBAL",
+        position="Superadmin",
+    )
+    await message.answer(
+        (
+            "✅ <b>Superadmin добавлен!</b>\n\n"
+            f"👤 {full_name}\n"
+            f"🆔 {data['tg_id']}\n"
+        )
+    )
+    await state.clear()
