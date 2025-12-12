@@ -1,19 +1,27 @@
 import asyncio
 import logging
+import sys
+from pathlib import Path
+
+# Allow running as a script: `python app/main.py`
+# (adds repo root to sys.path so `import config` works)
+if __package__ is None or __package__ == "":
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root))
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from handlers.admin import router as admin_router
-from handlers.start import router as start_router
-from handlers.worker import router as worker_router
-import database as db
+from config import settings
+from app import crud as db
+from app.db import init_db
+from app.handlers.admin import router as admin_router
+from app.handlers.start import router as start_router
+from app.handlers.worker import router as worker_router
 
-BOT_TOKEN="8213489358:AAEmAe8BR6u2OBe7n2cWEbPzcQCktq0tKOQ"
 
 async def main():
-    # Создаем таблицы БД (если их нет)
-    await db.async_main()
     
     # --- ВРЕМЕННОЕ РЕШЕНИЕ: Добавляем ВАС как админа ---
     # Замените 123456789 на ваш реальный Telegram ID (его пришлет бот, если вы не в базе)
@@ -27,8 +35,15 @@ async def main():
     )
 
     # ----------------------------------------------------
+    if not settings.bot_token:
+        raise ValueError(
+            "BOT token is not set. Put it into .env as BOT_TOKEN=... (or set bot_token env var)."
+        )
 
-    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dp = Dispatcher()
     
     dp.include_router(admin_router)

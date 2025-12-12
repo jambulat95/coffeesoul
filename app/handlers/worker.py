@@ -2,8 +2,8 @@ from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-import database as db
-import keyboards as kb
+from app import crud as db
+from app import keyboards as kb
 
 router = Router()
 

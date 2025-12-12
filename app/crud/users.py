@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from sqlalchemy import select
+
+from app.db import async_session
+from app.models import User
+
+
+async def get_user(tg_id: int) -> User | None:
+    async with async_session() as session:
+        return await session.scalar(select(User).where(User.tg_id == tg_id))
+
+
+async def add_user(
+    tg_id: int,
+    full_name: str,
+    role: str,
+    shop_id: str,
+    position: str,
+) -> None:
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == tg_id))
+        if user:
+            return
+
+        session.add(
+            User(
+                tg_id=tg_id,
+                full_name=full_name,
+                role=role,
+                shop_id=shop_id,
+                position=position,
+            )
+        )
+        await session.commit()
+
+
+async def delete_user(user_id: int) -> bool:
+    async with async_session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            return False
+
+        await session.delete(user)
+        await session.commit()
+        return True
+
+
+async def get_all_positions() -> list[str]:
+    async with async_session() as session:
+        query = select(User.position).where(User.role == "worker").distinct()
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+
+async def get_all_workers() -> list[User]:
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.role == "worker"))
+        return list(result.scalars().all())
+
+
+async def get_all_shops() -> list[str]:
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.shop_id).where(User.shop_id.is_not(None)).distinct()
+        )
+        return [s for s in result.scalars().all() if s]
+
+
+async def get_employees_by_shop(shop_id: str) -> list[User]:
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(User.shop_id == shop_id).order_by(User.full_name)
+        )
+        return list(result.scalars().all())
+
+
+async def get_employees_with_reports() -> list[User]:
+    # NOTE: implemented in reports.py to avoid circular joins.
+    from app.models import Report
+
+    async with async_session() as session:
+        query = select(User).join(Report, User.id == Report.user_id).distinct()
+        result = await session.execute(query)
+        return list(result.scalars().all())

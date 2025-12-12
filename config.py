@@ -1,8 +1,10 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    bot_token: str
-    database_url: str = "sqlite+aiosqlite:///database.db"
+    # NOTE: default "" so imports don't crash when env missing.
+    # main.py will validate that token is set before starting polling.
+    bot_token: str = ""
+    database_url: str 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 settings = Settings()

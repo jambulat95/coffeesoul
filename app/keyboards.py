@@ -1,11 +1,9 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-# --- ГЛАВНЫЕ МЕНЮ (Reply) ---
-
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 # --- МЕНЮ СУПЕР-АДМИНА ---
 superadmin_kb = ReplyKeyboardMarkup(keyboard=[
@@ -22,7 +20,7 @@ admin_kb = ReplyKeyboardMarkup(keyboard=[
 
 # --- МЕНЮ СОТРУДНИКА ---
 worker_kb = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="✅ Начать проверку")],
+    [KeyboardButton(text="✅ Пройти чек-лист")],
     [KeyboardButton(text="👤 Мой профиль")]
 ], resize_keyboard=True)
 
@@ -69,22 +67,3 @@ stats_type_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📥 Скачать Excel файл", callback_data="stats_excel")],
     [InlineKeyboardButton(text="📱 Смотреть в чате", callback_data="stats_chat")],
 ])
-
-def days_selection_kb(selected_days: list):
-    days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-    builder = InlineKeyboardBuilder()
-    
-    for i, day_name in enumerate(days):
-        # Если день выбран, ставим галочку
-        label = f"✅ {day_name}" if str(i) in selected_days else day_name
-        builder.button(text=label, callback_data=f"toggle_day_{i}")
-        
-    builder.adjust(7) # 7 кнопок в ряд
-    
-    # Кнопки управления
-    builder.row(InlineKeyboardButton(text="Выбрать все", callback_data="days_all"))
-    builder.row(InlineKeyboardButton(text="🧹 Очистить", callback_data="days_clear"))
-    builder.row(InlineKeyboardButton(text="💾 Готово (Далее)", callback_data="days_done"))
-    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_assign"))
-    
-    return builder.as_markup()

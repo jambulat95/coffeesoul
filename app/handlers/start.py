@@ -1,8 +1,8 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import CommandStart
-import database as db
-import keyboards as kb
+from app import crud as db
+from app import keyboards as kb
 
 router = Router()
 
