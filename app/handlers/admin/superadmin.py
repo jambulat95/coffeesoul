@@ -3,6 +3,7 @@ from __future__ import annotations
 from aiogram import F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app import crud as db
 from app.utils import cancel_kb
@@ -59,8 +60,17 @@ async def set_manager_id(message: types.Message, state: FSMContext) -> None:
 @router.message(AddManager.full_name)
 async def set_manager_name(message: types.Message, state: FSMContext) -> None:
     await state.update_data(full_name=message.text)
+    data = await state.get_data()
+    # Создаем пользователя-админа без конкретной точки (точки храним в admin_shops)
+    await db.add_user(
+        tg_id=data["tg_id"],
+        full_name=data["full_name"],
+        role="admin",
+        shop_id="Управляющий",
+        position="Управляющий",
+    )
     await message.answer(
-        "🏠 Введите <b>Название точки</b> (Локации), которой он будет управлять:",
+        "🏠 Введите точки, которой он будет управлять:",
         reply_markup=cancel_kb(),
     )
     await state.set_state(AddManager.shop_name)
@@ -71,22 +81,41 @@ async def set_manager_shop(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     shop_name = message.text
 
-    await db.add_user(
-        tg_id=data["tg_id"],
-        full_name=data["full_name"],
-        role="admin",
-        shop_id=shop_name,
-        position="Управляющий",
-    )
+    await db.add_admin_shop(admin_tg_id=data["tg_id"], shop_name=shop_name)
+    shops = data.get("shops", [])
+    shops.append(shop_name)
+    await state.update_data(shops=shops)
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Добавить еще точку", callback_data="add_more_shops")
+    builder.button(text="✅ Готово, хватит", callback_data="finish_manager")
+    builder.adjust(1)
+
     await message.answer(
-        (
-            "✅ <b>Управляющий назначен!</b>\n\n"
-            f"👤 {data['full_name']}\n"
-            f"🏠 Точка: <b>{shop_name}</b>\n\n"
+        f"✅ Точка <b>«{shop_name}»</b> добавлена.\nЕсть ли еще точки?",
+        reply_markup=builder.as_markup(),
+    )
+    await state.set_state(AddManager.more_shops)
+
+
+@router.callback_query(AddManager.more_shops)
+async def process_more_shops(callback: types.CallbackQuery, state: FSMContext) -> None:
+    if callback.data == "add_more_shops":
+        await callback.message.edit_text(
+            "🏠 Введите название следующей точки:", reply_markup=cancel_kb()
+        )
+        await state.set_state(AddManager.shop_name)
+    else:
+        data = await state.get_data()
+        shops = data.get("shops", [])
+        shops_text = shops[0] if len(shops) == 1 else ", ".join(shops)
+        await callback.message.edit_text(
+            "✅ Управляющий назначен!\n\n"
+            f"👤 {data.get('full_name', '')}\n"
+            f"🏠 Точка: {shops_text}\n\n"
             "Теперь он может создавать сотрудников."
         )
-    )
-    await state.clear()
+        await state.clear()
 
 
 @router.message(Command("add_superadmin"))

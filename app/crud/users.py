@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db import async_session
-from app.models import User
+from app.models import AdminShop, User
 
 
 async def get_user(tg_id: int) -> User | None:
@@ -35,11 +35,38 @@ async def add_user(
         await session.commit()
 
 
+async def add_admin_shop(admin_tg_id: int, shop_name: str) -> None:
+    """Attach a shop to an admin (avoids duplicates)."""
+    async with async_session() as session:
+        exists = await session.scalar(
+            select(AdminShop).where(
+                (AdminShop.admin_tg_id == admin_tg_id) & (AdminShop.shop_name == shop_name)
+            )
+        )
+        if exists:
+            return
+
+        session.add(AdminShop(admin_tg_id=admin_tg_id, shop_name=shop_name))
+        await session.commit()
+
+
+async def get_admin_shops(admin_tg_id: int) -> list[str]:
+    """Return all shop names attached to the admin."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(AdminShop.shop_name).where(AdminShop.admin_tg_id == admin_tg_id)
+        )
+        return list(result.scalars().all())
+
+
 async def delete_user(user_id: int) -> bool:
     async with async_session() as session:
         user = await session.get(User, user_id)
         if not user:
             return False
+
+        if user.role == "admin":
+            await session.execute(delete(AdminShop).where(AdminShop.admin_tg_id == user.tg_id))
 
         await session.delete(user)
         await session.commit()

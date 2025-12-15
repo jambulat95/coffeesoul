@@ -25,9 +25,14 @@ class User(Base):
     tg_id: Mapped[int] = mapped_column(BigInteger, unique=True)
     full_name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20))
-    shop_id: Mapped[str] = mapped_column(String(50))
+    shop_id: Mapped[str] = mapped_column(String(50), nullable=True)
     position: Mapped[str] = mapped_column(String(50))
 
+class AdminShop(Base):
+    __tablename__ = 'admin_shops'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_tg_id: Mapped[int] = mapped_column(BigInteger) # ID админа
+    shop_name: Mapped[str] = mapped_column(String(50)) 
 
 class Checklist(Base):
     __tablename__ = "checklists"

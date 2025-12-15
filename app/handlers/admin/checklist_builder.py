@@ -33,7 +33,39 @@ async def set_title(message: types.Message, state: FSMContext) -> None:
         await db.update_checklist(data["checklist_id"], title=message.text)
 
     await state.update_data(title=message.text)
-    await show_assign_position_menu(message, state, is_edit=False)
+    admin_shops = await db.get_admin_shops(message.from_user.id)
+
+    if len(admin_shops) == 1:
+        await state.update_data(shop_id=admin_shops[0])
+        await show_assign_position_menu(message, state, is_edit=False)
+    else:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🌍 Для всех моих точек", callback_data="shop_all")
+        for shop in admin_shops:
+            builder.button(text=f"🏠 {shop}", callback_data=f"shop_sel_{shop}")
+        builder.adjust(1)
+        builder.button(text="❌ Отмена", callback_data="cancel_creation")
+
+        await message.answer(
+            "📍 <b>Для какой точки этот шаблон?</b>", reply_markup=builder.as_markup()
+        )
+        await state.set_state(CreateChecklist.select_shop)
+
+
+@router.callback_query(CreateChecklist.select_shop)
+async def set_checklist_shop(callback: types.CallbackQuery, state: FSMContext) -> None:
+    if callback.data == "cancel_creation":
+        await state.clear()
+        await callback.message.edit_text("❌ Действие отменено.")
+        return
+
+    if callback.data == "shop_all":
+        await state.update_data(shop_id=None)  # None = для всех точек админа
+    else:
+        shop_name = callback.data.split("_", 2)[2]
+        await state.update_data(shop_id=shop_name)
+
+    await show_assign_position_menu(callback, state, is_edit=True)
 
 
 async def show_assign_position_menu(message_or_callback, state: FSMContext, is_edit: bool = False) -> None:
@@ -76,10 +108,7 @@ async def set_assignee(callback: types.CallbackQuery, state: FSMContext) -> None
         target_position = callback.data.split("_", 2)[2]
 
     data = await state.get_data()
-
-    # Привязываем к точке админа
-    admin_user = await db.get_user(callback.from_user.id)
-    shop_id = admin_user.shop_id if admin_user else "Главный офис"
+    shop_id = data.get("shop_id")
 
     if "checklist_id" in data:
         await db.update_checklist(
@@ -93,9 +122,10 @@ async def set_assignee(callback: types.CallbackQuery, state: FSMContext) -> None
         await state.update_data(checklist_id=checklist_id)
 
     pos_text = target_position if target_position else "Все должности"
+    shop_text = shop_id if shop_id else "Все мои точки"
 
     await callback.message.edit_text(
-        f"✅ Шаблон создан.\n🎯 Для: <b>{pos_text}</b>\n\n👇 Введите текст <b>первого вопроса</b>:",
+        f"✅ Шаблон создан.\n🏠 Точка: <b>{shop_text}</b>\n🎯 Для: <b>{pos_text}</b>\n\n👇 Введите текст <b>первого вопроса</b>:",
         reply_markup=nav_kb("back_to_assign"),
     )
     await state.set_state(CreateChecklist.question_text)

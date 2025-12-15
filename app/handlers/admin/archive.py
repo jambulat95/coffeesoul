@@ -29,18 +29,27 @@ async def back_to_modes(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data == "show_general_stats")
 async def show_general_stats(callback: types.CallbackQuery) -> None:
+    admin_shops = await db.get_admin_shops(callback.from_user.id)
     stats = await db.get_monthly_stats_by_shop()
     if not stats:
         await callback.answer("Данных нет.", show_alert=True)
         return
 
     text_lines = ["📊 <b>Сводка эффективности (Текущий месяц)</b>", "➖➖➖➖➖➖➖➖➖➖"]
+    has_data = False
     for shop, avg_score, _count in stats:
+        if shop not in admin_shops:
+            continue
+        has_data = True
         score = int(avg_score)
         icon = "🟢" if score >= 90 else "🟡" if score >= 75 else "🔴"
         text_lines.append(f"🏠 <b>{shop}</b>")
         text_lines.append(f"   📈 Результат: <b>{icon} {score}%</b>")
         text_lines.append("")
+
+    if not has_data:
+        await callback.answer("По вашим точкам данных нет.", show_alert=True)
+        return
 
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data="back_to_modes")
@@ -104,14 +113,16 @@ async def stats_show_reports_list(callback: types.CallbackQuery, state: FSMConte
 @router.callback_query(F.data == "mode_by_employee")
 async def mode_by_employee(callback: types.CallbackQuery) -> None:
     users = await db.get_employees_with_reports()
-    if not users:
+    admin_shops = await db.get_admin_shops(callback.from_user.id)
+    my_users = [u for u in users if u.shop_id in admin_shops]
+    if not my_users:
         builder = InlineKeyboardBuilder()
         builder.button(text="🔙 Назад", callback_data="back_to_modes")
         await callback.message.edit_text("📭 Нет отчетов.", reply_markup=builder.as_markup())
         return
 
     builder = InlineKeyboardBuilder()
-    for user in users:
+    for user in my_users:
         builder.button(text=f"👤 {user.full_name}", callback_data=f"hist_user_{user.tg_id}")
     builder.button(text="🔙 Назад", callback_data="back_to_modes")
     builder.adjust(1)

@@ -4,11 +4,13 @@ Re-exports commonly used functions for convenience.
 """
 
 from .users import (
+    add_admin_shop,
     add_user,
     delete_user,
     get_all_positions,
     get_all_shops,
     get_all_workers,
+    get_admin_shops,
     get_employees_by_shop,
     get_employees_with_reports,
     get_user,
@@ -38,10 +40,12 @@ __all__ = [
     # users
     "get_user",
     "add_user",
+    "add_admin_shop",
     "delete_user",
     "get_all_positions",
     "get_all_workers",
     "get_all_shops",
+    "get_admin_shops",
     "get_employees_by_shop",
     "get_employees_with_reports",
     # checklists
