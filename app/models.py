@@ -57,6 +57,7 @@ class Question(Base):
     text: Mapped[str] = mapped_column(String(255))
     type: Mapped[str] = mapped_column(String(20))
     needs_photo: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     checklist = relationship("Checklist", back_populates="questions")
 

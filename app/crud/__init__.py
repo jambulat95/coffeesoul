@@ -18,11 +18,16 @@ from .users import (
 from .checklists import (
     add_question,
     create_checklist,
+    delete_checklist,
+    delete_question,
+    get_checklist,
     get_checklists,
     get_checklists_for_user,
     get_checklists_today,
+    get_question,
     get_questions,
     update_checklist,
+    update_question,
 )
 from .reports import (
     create_report,
@@ -51,10 +56,15 @@ __all__ = [
     # checklists
     "create_checklist",
     "update_checklist",
+    "delete_checklist",
+    "get_checklist",
     "get_checklists_for_user",
     "get_checklists",
     "get_questions",
+    "get_question",
     "add_question",
+    "update_question",
+    "delete_question",
     "get_checklists_today",
     # reports
     "create_report",

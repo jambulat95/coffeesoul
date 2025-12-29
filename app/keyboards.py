@@ -14,8 +14,8 @@ superadmin_kb = ReplyKeyboardMarkup(keyboard=[
 # --- МЕНЮ УПРАВЛЯЮЩЕГО (ADMIN) ---
 # У него нет кнопки "Создать точку", он управляет только своей
 admin_kb = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="📝 Создать шаблон"), KeyboardButton(text="🗄 Архив")],
-    [KeyboardButton(text="👥 Мои сотрудники")] 
+    [KeyboardButton(text="📝 Создать шаблон"), KeyboardButton(text="✏️ Редактировать шаблон")],
+    [KeyboardButton(text="🗄 Архив"), KeyboardButton(text="👥 Мои сотрудники")] 
 ], resize_keyboard=True)
 
 # --- МЕНЮ СОТРУДНИКА ---

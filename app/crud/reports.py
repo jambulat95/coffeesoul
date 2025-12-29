@@ -47,8 +47,11 @@ async def finish_report_calculation(report_id: int) -> int:
             or 0
         )
         report = await session.get(Report, report_id)
+        # Для расчета баллов учитываем только не удаленные вопросы
         questions = await session.scalars(
-            select(Question).where(Question.checklist_id == report.checklist_id)
+            select(Question)
+            .where(Question.checklist_id == report.checklist_id)
+            .where(Question.is_deleted == False)
         )
 
         max_points = 0

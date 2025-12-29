@@ -31,3 +31,17 @@ class AddSuperAdmin(StatesGroup):
     tg_id = State()
     full_name = State()
 
+
+class EditChecklist(StatesGroup):
+    select_checklist = State()
+    edit_title = State()
+    edit_shop = State()
+    edit_position = State()
+    edit_questions_list = State()
+    edit_question_text = State()
+    edit_question_type = State()
+    edit_question_photo = State()
+    add_new_question_text = State()
+    add_new_question_type = State()
+    add_new_question_photo = State()
+
