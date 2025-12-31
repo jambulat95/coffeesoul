@@ -124,34 +124,60 @@ async def delete_question(question_id: int) -> None:
             await session.commit()
 
 
-async def delete_checklist(checklist_id: int) -> tuple[bool, str]:
+async def delete_checklist(checklist_id: int) -> tuple[bool, str, int]:
     """
-    Удаляет чек-лист. Возвращает (успех, сообщение).
-    Если есть отчеты, возвращает False и предупреждение.
+    Удаляет чек-лист вместе со всеми отчетами и ответами.
+    Возвращает (успех, сообщение, количество удаленных отчетов).
     """
-    from app.models import Report
-    from sqlalchemy import func
+    from app.models import Answer, Report
+    from sqlalchemy import delete, func
     
     async with async_session() as session:
-        # Проверяем, есть ли отчеты для этого чек-листа
-        reports_count = await session.scalar(
-            select(func.count(Report.id)).where(Report.checklist_id == checklist_id)
-        )
-        
-        if reports_count and reports_count > 0:
-            return (
-                False,
-                f"⚠️ Невозможно удалить шаблон: найдено {reports_count} отчетов. "
-                "Сначала удалите все отчеты или используйте архивацию."
-            )
-        
         checklist = await session.get(Checklist, checklist_id)
         if not checklist:
-            return (False, "Шаблон не найден.")
+            return (False, "Шаблон не найден.", 0)
         
+        # Подсчитываем количество отчетов перед удалением
+        reports_count = await session.scalar(
+            select(func.count(Report.id)).where(Report.checklist_id == checklist_id)
+        ) or 0
+        
+        # Удаляем все ответы, связанные с отчетами этого чек-листа
+        if reports_count > 0:
+            # Получаем ID всех отчетов для этого чек-листа
+            report_ids_result = await session.execute(
+                select(Report.id).where(Report.checklist_id == checklist_id)
+            )
+            report_ids = [row[0] for row in report_ids_result.all()]
+            
+            # Удаляем все ответы для этих отчетов
+            if report_ids:
+                await session.execute(
+                    delete(Answer).where(Answer.report_id.in_(report_ids))
+                )
+            
+            # Удаляем все отчеты
+            await session.execute(
+                delete(Report).where(Report.checklist_id == checklist_id)
+            )
+        
+        # Удаляем сам чек-лист (вопросы удалятся автоматически через cascade)
         await session.delete(checklist)
         await session.commit()
-        return (True, f"✅ Шаблон '{checklist.title}' успешно удален.")
+        
+        checklist_title = checklist.title
+        if reports_count > 0:
+            return (
+                True,
+                f"✅ Шаблон '{checklist_title}' и {reports_count} связанных отчетов успешно удалены.",
+                reports_count
+            )
+        else:
+            return (
+                True,
+                f"✅ Шаблон '{checklist_title}' успешно удален.",
+                0
+            )
 
 
 async def get_checklists_today() -> list[Checklist]:

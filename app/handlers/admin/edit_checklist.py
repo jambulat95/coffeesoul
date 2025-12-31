@@ -338,10 +338,69 @@ async def back_to_edit_menu(callback: types.CallbackQuery, state: FSMContext) ->
     await show_checklist_menu(fake_callback, state)
 
 
+# Специфичные обработчики должны быть ПЕРЕД общим обработчиком edit_question_menu
+# чтобы они проверялись первыми
+@router.callback_query(F.data == "edit_q_text")
+async def start_edit_q_text(callback: types.CallbackQuery, state: FSMContext) -> None:
+    await callback.message.edit_text(
+        "✏️ <b>Изменение текста вопроса</b>\nВведите новый текст:",
+        reply_markup=cancel_kb("cancel_edit")
+    )
+    await state.set_state(EditChecklist.edit_question_text)
+
+
+@router.callback_query(F.data == "edit_q_type")
+async def start_edit_q_type(callback: types.CallbackQuery, state: FSMContext) -> None:
+    builder = InlineKeyboardBuilder()
+    builder.attach(InlineKeyboardBuilder.from_markup(kb.type_kb))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit"))
+    
+    data = await state.get_data()
+    question_id = data["question_id"]
+    question = await db.get_question(question_id)
+    
+    await callback.message.edit_text(
+        f"🔄 <b>Изменение типа вопроса</b>\n\nТекущий вопрос: <b>{question.text}</b>\n\nВыберите новый тип:",
+        reply_markup=builder.as_markup()
+    )
+    await state.set_state(EditChecklist.edit_question_type)
+
+
+@router.callback_query(F.data == "edit_q_photo")
+async def start_edit_q_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
+    builder = InlineKeyboardBuilder()
+    builder.attach(InlineKeyboardBuilder.from_markup(kb.photo_kb))
+    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit"))
+    
+    await callback.message.edit_text(
+        "📸 <b>Нужно ли фото?</b>",
+        reply_markup=builder.as_markup()
+    )
+    await state.set_state(EditChecklist.edit_question_photo)
+
+
 @router.callback_query(F.data.startswith("edit_q_"))
 async def edit_question_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Меню редактирования конкретного вопроса"""
-    question_id = int(callback.data.split("_")[2])
+    # Проверяем, что это не команда типа edit_q_text, edit_q_type, edit_q_photo
+    # Эти команды обрабатываются отдельными обработчиками
+    if callback.data in ["edit_q_text", "edit_q_type", "edit_q_photo"]:
+        return
+    
+    # Проверяем, что после "edit_q_" идет число (ID вопроса)
+    parts = callback.data.split("_")
+    if len(parts) < 3:
+        return
+    
+    # Проверяем, что третья часть состоит только из цифр
+    if not parts[2].isdigit():
+        return
+    
+    try:
+        question_id = int(parts[2])
+    except (ValueError, TypeError):
+        return
+    
     question = await db.get_question(question_id)
     
     if not question:
@@ -377,15 +436,6 @@ async def edit_question_menu(callback: types.CallbackQuery, state: FSMContext) -
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
 
 
-@router.callback_query(F.data == "edit_q_text")
-async def start_edit_q_text(callback: types.CallbackQuery, state: FSMContext) -> None:
-    await callback.message.edit_text(
-        "✏️ <b>Изменение текста вопроса</b>\nВведите новый текст:",
-        reply_markup=cancel_kb("cancel_edit")
-    )
-    await state.set_state(EditChecklist.edit_question_text)
-
-
 @router.message(EditChecklist.edit_question_text)
 async def save_q_text(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
@@ -403,23 +453,6 @@ async def save_q_text(message: types.Message, state: FSMContext) -> None:
         answer=lambda **kwargs: None  # Заглушка для answer
     )
     await edit_question_menu(fake_callback, state)
-
-
-@router.callback_query(F.data == "edit_q_type")
-async def start_edit_q_type(callback: types.CallbackQuery, state: FSMContext) -> None:
-    builder = InlineKeyboardBuilder()
-    builder.attach(InlineKeyboardBuilder.from_markup(kb.type_kb))
-    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit"))
-    
-    data = await state.get_data()
-    question_id = data["question_id"]
-    question = await db.get_question(question_id)
-    
-    await callback.message.edit_text(
-        f"🔄 <b>Изменение типа вопроса</b>\n\nТекущий вопрос: <b>{question.text}</b>\n\nВыберите новый тип:",
-        reply_markup=builder.as_markup()
-    )
-    await state.set_state(EditChecklist.edit_question_type)
 
 
 @router.callback_query(EditChecklist.edit_question_type)
@@ -445,19 +478,6 @@ async def save_q_type(callback: types.CallbackQuery, state: FSMContext) -> None:
         answer=callback.answer
     )
     await edit_question_menu(fake_callback, state)
-
-
-@router.callback_query(F.data == "edit_q_photo")
-async def start_edit_q_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
-    builder = InlineKeyboardBuilder()
-    builder.attach(InlineKeyboardBuilder.from_markup(kb.photo_kb))
-    builder.row(types.InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit"))
-    
-    await callback.message.edit_text(
-        "📸 <b>Нужно ли фото?</b>",
-        reply_markup=builder.as_markup()
-    )
-    await state.set_state(EditChecklist.edit_question_photo)
 
 
 @router.callback_query(EditChecklist.edit_question_photo)
@@ -620,6 +640,10 @@ async def set_new_q_photo(callback: types.CallbackQuery, state: FSMContext) -> N
 @router.callback_query(F.data == "delete_checklist")
 async def confirm_delete_checklist(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Подтверждение удаления чек-листа"""
+    from app.models import Report
+    from sqlalchemy import func, select
+    from app.db import async_session
+    
     data = await state.get_data()
     checklist_id = data.get("checklist_id")
     
@@ -632,15 +656,28 @@ async def confirm_delete_checklist(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("Шаблон не найден.", show_alert=True)
         return
     
+    # Подсчитываем количество отчетов
+    async with async_session() as session:
+        reports_count = await session.scalar(
+            select(func.count(Report.id)).where(Report.checklist_id == checklist_id)
+        ) or 0
+    
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Да, удалить", callback_data="confirm_delete_checklist")
     builder.button(text="❌ Отмена", callback_data="back_to_edit_menu")
     builder.adjust(1)
     
+    warning_text = ""
+    if reports_count > 0:
+        warning_text = (
+            f"\n\n⚠️ <b>ВНИМАНИЕ!</b>\n"
+            f"У этого шаблона есть <b>{reports_count} отчетов</b>.\n"
+            f"При удалении шаблона <b>все отчеты будут удалены безвозвратно!</b>"
+        )
+    
     await callback.message.edit_text(
         f"⚠️ <b>Удаление шаблона</b>\n\n"
-        f"Вы уверены, что хотите удалить шаблон <b>«{checklist.title}»</b>?\n\n"
-        f"⚠️ <b>Внимание:</b> Если у шаблона есть отчеты, удаление будет невозможно.",
+        f"Вы уверены, что хотите удалить шаблон <b>«{checklist.title}»</b>?{warning_text}",
         reply_markup=builder.as_markup()
     )
 
@@ -655,7 +692,7 @@ async def delete_checklist_handler(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("Ошибка: не найден ID шаблона.", show_alert=True)
         return
     
-    success, result_message = await db.delete_checklist(checklist_id)
+    success, result_message, reports_deleted = await db.delete_checklist(checklist_id)
     
     if success:
         await callback.message.edit_text(result_message)
