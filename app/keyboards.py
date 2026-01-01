@@ -7,8 +7,8 @@ from aiogram.types import (
 
 # --- МЕНЮ СУПЕР-АДМИНА ---
 superadmin_kb = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="➕ Создать Управляющего")],
-    [KeyboardButton(text="📊 Полный Отчет (Месяц)")]
+    [KeyboardButton(text="➕ Создать Управляющего"), KeyboardButton(text="👥 Управление админами")],
+    [KeyboardButton(text="📊 Панель аналитики"), KeyboardButton(text="📊 Полный Отчет (Месяц)")]
 ], resize_keyboard=True)
 
 # --- МЕНЮ УПРАВЛЯЮЩЕГО (ADMIN) ---
@@ -66,4 +66,13 @@ after_question_kb = InlineKeyboardMarkup(inline_keyboard=[
 stats_type_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="📥 Скачать Excel файл", callback_data="stats_excel")],
     [InlineKeyboardButton(text="📱 Смотреть в чате", callback_data="stats_chat")],
+])
+
+# 7. Панель аналитики суперадмина
+analytics_panel_kb = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="👔 Активность управленцев", callback_data="analytics_admins")],
+    [InlineKeyboardButton(text="👷 Активность сотрудников", callback_data="analytics_workers")],
+    [InlineKeyboardButton(text="📋 Все чек-листы", callback_data="analytics_checklists")],
+    [InlineKeyboardButton(text="📈 Общая статистика", callback_data="analytics_overview")],
+    [InlineKeyboardButton(text="🔙 Назад", callback_data="analytics_back")]
 ])

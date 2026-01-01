@@ -7,6 +7,7 @@ from .users import (
     add_admin_shop,
     add_user,
     delete_user,
+    get_all_admins,
     get_all_positions,
     get_all_shops,
     get_all_workers,
@@ -14,6 +15,8 @@ from .users import (
     get_employees_by_shop,
     get_employees_with_reports,
     get_user,
+    get_user_by_pk,
+    update_user,
 )
 from .checklists import (
     add_question,
@@ -40,15 +43,29 @@ from .reports import (
     get_today_completed_checklist_ids,
     save_answer_with_points,
 )
+from .analytics import (
+    get_admin_activity_stats,
+    get_admin_checklists,
+    get_admin_workers,
+    get_all_admins_activity,
+    get_all_checklists_stats,
+    get_all_workers_activity,
+    get_checklists_by_shop,
+    get_checklists_shops,
+    get_network_overview_stats,
+)
 
 __all__ = [
     # users
     "get_user",
+    "get_user_by_pk",
     "add_user",
     "add_admin_shop",
+    "update_user",
     "delete_user",
     "get_all_positions",
     "get_all_workers",
+    "get_all_admins",
     "get_all_shops",
     "get_admin_shops",
     "get_employees_by_shop",
@@ -77,4 +94,14 @@ __all__ = [
     "get_report_details",
     "get_employees_with_reports",
     "get_reports_by_user_tg_id",
+    # analytics
+    "get_admin_activity_stats",
+    "get_all_admins_activity",
+    "get_all_workers_activity",
+    "get_all_checklists_stats",
+    "get_network_overview_stats",
+    "get_admin_checklists",
+    "get_admin_workers",
+    "get_checklists_shops",
+    "get_checklists_by_shop",
 ]

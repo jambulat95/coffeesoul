@@ -110,8 +110,9 @@ async def show_users_for_del(callback: types.CallbackQuery) -> None:
     await callback.message.edit_text(msg_text, reply_markup=builder.as_markup())
 
 
-@router.callback_query(F.data.startswith("confirm_del_"))
+@router.callback_query(F.data.regexp(r"^confirm_del_\d+$"))
 async def process_delete(callback: types.CallbackQuery) -> None:
+    # callback_data format: "confirm_del_{user_id}" (only for workers, not admins)
     user_id = int(callback.data.split("_")[2])
     await db.delete_user(user_id)
     await callback.answer("✅ Удалено.", show_alert=True)

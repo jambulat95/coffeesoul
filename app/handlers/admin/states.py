@@ -45,3 +45,9 @@ class EditChecklist(StatesGroup):
     add_new_question_type = State()
     add_new_question_photo = State()
 
+
+class EditAdmin(StatesGroup):
+    select_admin = State()
+    edit_name = State()
+    edit_tg_id = State()
+

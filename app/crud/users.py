@@ -11,6 +11,11 @@ async def get_user(tg_id: int) -> User | None:
         return await session.scalar(select(User).where(User.tg_id == tg_id))
 
 
+async def get_user_by_pk(user_id: int) -> User | None:
+    async with async_session() as session:
+        return await session.get(User, user_id)
+
+
 async def add_user(
     tg_id: int,
     full_name: str,
@@ -59,6 +64,38 @@ async def get_admin_shops(admin_tg_id: int) -> list[str]:
         return list(result.scalars().all())
 
 
+async def update_user(user_id: int, full_name: str | None = None, tg_id: int | None = None) -> bool:
+    """Обновить данные пользователя."""
+    async with async_session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            return False
+
+        if full_name is not None:
+            user.full_name = full_name
+        if tg_id is not None:
+            # Проверяем, что новый tg_id не занят другим пользователем
+            existing_user = await session.scalar(select(User).where(User.tg_id == tg_id))
+            if existing_user and existing_user.id != user_id:
+                return False
+            # Если это админ, обновляем admin_shops
+            if user.role == "admin":
+                old_tg_id = user.tg_id
+                user.tg_id = tg_id
+                # Обновляем admin_shops
+                from sqlalchemy import update
+                await session.execute(
+                    update(AdminShop)
+                    .where(AdminShop.admin_tg_id == old_tg_id)
+                    .values(admin_tg_id=tg_id)
+                )
+            else:
+                user.tg_id = tg_id
+
+        await session.commit()
+        return True
+
+
 async def delete_user(user_id: int) -> bool:
     async with async_session() as session:
         user = await session.get(User, user_id)
@@ -92,6 +129,26 @@ async def get_all_shops() -> list[str]:
             select(User.shop_id).where(User.shop_id.is_not(None)).distinct()
         )
         return [s for s in result.scalars().all() if s]
+
+
+async def get_all_worker_shops() -> list[str]:
+    """Get all unique shop IDs that have workers assigned."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.shop_id)
+            .where(User.role == "worker")
+            .where(User.shop_id.is_not(None))
+            .distinct()
+        )
+        return sorted([s for s in result.scalars().all() if s])
+
+
+async def get_all_admins() -> list[User]:
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(User.role == "admin").order_by(User.full_name)
+        )
+        return list(result.scalars().all())
 
 
 async def get_employees_by_shop(shop_id: str) -> list[User]:
