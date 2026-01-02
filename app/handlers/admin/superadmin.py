@@ -369,13 +369,13 @@ async def show_workers_activity(callback: types.CallbackQuery) -> None:
 
     await callback.answer("⏳ Загрузка...")
 
-    workers_stats = await db.get_all_workers_activity()
+    shops = await db.get_workers_shops()
 
-    if not workers_stats:
+    if not shops:
         try:
             await callback.message.edit_text(
                 "👷 <b>Активность сотрудников</b>\n\n"
-                "📉 Сотрудники не найдены.",
+                "📉 Точки с сотрудниками не найдены.",
                 reply_markup=kb.analytics_panel_kb,
             )
         except TelegramBadRequest as e:
@@ -383,12 +383,83 @@ async def show_workers_activity(callback: types.CallbackQuery) -> None:
                 await callback.answer()
         return
 
-    # Сортируем по количеству отчетов (самые активные сверху)
-    workers_stats.sort(key=lambda x: x.get("total_reports", 0), reverse=True)
+    builder = InlineKeyboardBuilder()
+    for shop in shops:
+        # Подсчитываем количество сотрудников для этой точки
+        workers_count = 0
+        if shop == "Без точки":
+            workers_stats, total = await db.get_workers_by_shop(None, offset=0, limit=1)
+            workers_count = total
+        else:
+            workers_stats, total = await db.get_workers_by_shop(shop, offset=0, limit=1)
+            workers_count = total
+        
+        button_text = f"🏠 {shop} ({workers_count})"
+        # Используем shop как callback_data, но для "Без точки" используем специальное значение
+        shop_callback = "worker_shop_none" if shop == "Без точки" else f"worker_shop_{shop}"
+        builder.button(text=button_text, callback_data=shop_callback)
 
-    text_lines = ["👷 <b>Активность сотрудников</b>", "➖➖➖➖➖➖➖➖➖➖"]
+    builder.button(text="🔙 Назад", callback_data="analytics_back")
+    builder.adjust(1)
 
-    for stats in workers_stats[:20]:  # Показываем топ-20
+    try:
+        await callback.message.edit_text(
+            "👷 <b>Активность сотрудников</b>\n\n"
+            "👇 Выберите точку для просмотра сотрудников:",
+            reply_markup=builder.as_markup(),
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            await callback.answer()
+        else:
+            raise
+
+
+@router.callback_query(F.data.startswith("worker_shop_"))
+async def show_workers_by_shop(callback: types.CallbackQuery) -> None:
+    user = await db.get_user(callback.from_user.id)
+    if not user or user.role != "superadmin":
+        await callback.answer("⛔️ Доступ запрещен.", show_alert=True)
+        return
+
+    await callback.answer("⏳ Загрузка...")
+
+    callback_data = callback.data
+    offset = 0
+    base_shop_callback = callback_data
+    
+    # Проверяем, есть ли offset в callback_data (для пагинации)
+    if "_offset_" in callback_data:
+        parts = callback_data.split("_offset_")
+        base_shop_callback = parts[0]
+        offset = int(parts[1])
+    
+    if base_shop_callback == "worker_shop_none":
+        shop_id = None
+        shop_name = "Без точки"
+    else:
+        shop_id = base_shop_callback.replace("worker_shop_", "", 1)
+        shop_name = shop_id
+
+    workers_stats, total_count = await db.get_workers_by_shop(shop_id, offset=offset, limit=5)
+
+    if not workers_stats:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔙 Назад к точкам", callback_data="analytics_workers")
+        try:
+            await callback.message.edit_text(
+                f"👷 <b>Сотрудники точки: {shop_name}</b>\n\n"
+                "📉 Сотрудники не найдены.",
+                reply_markup=builder.as_markup(),
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e).lower():
+                await callback.answer()
+        return
+
+    text_lines = [f"👷 <b>Сотрудники точки: {shop_name}</b>", "➖➖➖➖➖➖➖➖➖➖"]
+
+    for stats in workers_stats:
         worker = stats.get("worker")
         if not worker:
             continue
@@ -401,7 +472,7 @@ async def show_workers_activity(callback: types.CallbackQuery) -> None:
         score_icon = "🟢" if avg_score >= 90 else "🟡" if avg_score >= 75 else "🔴"
 
         text_lines.append(f"\n👤 <b>{worker.full_name}</b>")
-        text_lines.append(f"   🏠 {worker.shop_id or 'Без точки'}")
+        text_lines.append(f"   💼 {worker.position}")
         text_lines.append(f"   📊 Всего отчетов: {total_reports}")
         text_lines.append(f"   {score_icon} Средний балл: {avg_score}%")
         text_lines.append(f"   📈 Отчетов (7 дней): {reports_week}")
@@ -424,22 +495,44 @@ async def show_workers_activity(callback: types.CallbackQuery) -> None:
         else:
             text_lines.append("   🕐 Последняя активность: нет данных")
 
-    if len(workers_stats) > 20:
-        text_lines.append(f"\n<i>... и еще {len(workers_stats) - 20} сотрудников</i>")
-
     text_lines.append("\n" + "➖➖➖➖➖➖➖➖➖➖")
+    
+    if offset + len(workers_stats) < total_count:
+        text_lines.append(f"\n<i>Показано {offset + 1}-{offset + len(workers_stats)} из {total_count}</i>")
+    else:
+        text_lines.append(f"\n<i>Показано {offset + 1}-{total_count} из {total_count}</i>")
+
+    builder = InlineKeyboardBuilder()
+    
+    # Кнопка "Далее" если есть еще сотрудники
+    if offset + len(workers_stats) < total_count:
+        next_offset = offset + 5
+        next_callback = f"{base_shop_callback}_offset_{next_offset}"
+        builder.button(text="➡️ Далее", callback_data=next_callback)
+    
+    # Кнопка "Назад" если не на первой странице
+    if offset > 0:
+        prev_offset = max(0, offset - 5)
+        if prev_offset == 0:
+            prev_callback = base_shop_callback
+        else:
+            prev_callback = f"{base_shop_callback}_offset_{prev_offset}"
+        builder.button(text="⬅️ Назад", callback_data=prev_callback)
+    
+    builder.button(text="🔙 Назад к точкам", callback_data="analytics_workers")
+    builder.adjust(2, 1)
 
     full_text = "\n".join(text_lines)
     try:
         if len(full_text) > 4000:
             first_part = "\n".join(text_lines[:15]) + "\n\n<i>... (продолжение в следующем сообщении)</i>"
-            await callback.message.edit_text(first_part, reply_markup=kb.analytics_panel_kb)
+            await callback.message.edit_text(first_part, reply_markup=builder.as_markup())
             remaining_lines = text_lines[15:]
             if remaining_lines:
                 remaining_text = "\n".join(remaining_lines)
                 await callback.message.answer(remaining_text)
         else:
-            await callback.message.edit_text(full_text, reply_markup=kb.analytics_panel_kb)
+            await callback.message.edit_text(full_text, reply_markup=builder.as_markup())
     except TelegramBadRequest as e:
         if "message is not modified" in str(e).lower():
             await callback.answer()

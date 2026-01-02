@@ -53,6 +53,8 @@ from .analytics import (
     get_checklists_by_shop,
     get_checklists_shops,
     get_network_overview_stats,
+    get_workers_by_shop,
+    get_workers_shops,
 )
 
 __all__ = [
@@ -104,4 +106,6 @@ __all__ = [
     "get_admin_workers",
     "get_checklists_shops",
     "get_checklists_by_shop",
+    "get_workers_shops",
+    "get_workers_by_shop",
 ]

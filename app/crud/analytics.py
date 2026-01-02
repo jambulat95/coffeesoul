@@ -335,6 +335,61 @@ async def get_admin_workers(admin_tg_id: int) -> list[dict]:
         return result
 
 
+async def get_workers_shops() -> list[str]:
+    """Получить список всех уникальных точек, у которых есть сотрудники."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(User.shop_id)
+            .where(User.role == "worker")
+            .where(User.shop_id.is_not(None))
+            .distinct()
+            .order_by(User.shop_id)
+        )
+        shops = [row[0] for row in result.all() if row[0]]
+        # Добавляем "Без точки" если есть сотрудники без точки
+        workers_without_shop = await session.scalar(
+            select(func.count(User.id)).where(User.role == "worker").where(User.shop_id.is_(None))
+        )
+        if workers_without_shop and workers_without_shop > 0:
+            shops.append("Без точки")
+        return shops
+
+
+async def get_workers_by_shop(shop_id: str | None, offset: int = 0, limit: int = 5) -> tuple[list[dict], int]:
+    """Получить сотрудников конкретной точки с пагинацией.
+    
+    Returns:
+        tuple: (список сотрудников со статистикой, общее количество сотрудников)
+    """
+    async with async_session() as session:
+        if shop_id == "Без точки":
+            query = select(User).where(User.role == "worker").where(User.shop_id.is_(None))
+            count_query = select(func.count(User.id)).where(User.role == "worker").where(User.shop_id.is_(None))
+        else:
+            query = select(User).where(User.role == "worker").where(User.shop_id == shop_id)
+            count_query = select(func.count(User.id)).where(User.role == "worker").where(User.shop_id == shop_id)
+        
+        # Получаем общее количество
+        total_count = await session.scalar(count_query) or 0
+        
+        # Получаем сотрудников с пагинацией, сортируем по активности (по количеству отчетов)
+        workers_result = await session.execute(
+            query.order_by(User.full_name).offset(offset).limit(limit)
+        )
+        workers = list(workers_result.scalars().all())
+        
+        result = []
+        for worker in workers:
+            stats = await get_worker_activity_stats(worker.id)
+            if stats:
+                result.append(stats)
+        
+        # Сортируем по активности (количество отчетов)
+        result.sort(key=lambda x: x.get("total_reports", 0), reverse=True)
+        
+        return result, total_count
+
+
 async def get_network_overview_stats() -> dict:
     """Получить общую статистику по сети."""
     async with async_session() as session:
